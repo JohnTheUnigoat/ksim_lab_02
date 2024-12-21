@@ -181,6 +181,7 @@ end
 ```
 
 Фінальний код моделі доступний за [посиланням](rabbits_grass_weed.nlogo)
+
 За цим [посиланням](https://github.com/JohnTheUnigoat/ksim_lab_02/compare/initial_model...updated_model) можна побачити всі внесені зміни в вихідну модель.
 
 ## Обчислювальні експерименти
