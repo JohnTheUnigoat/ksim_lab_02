@@ -132,9 +132,13 @@ to reproduce ;; rabbit procedure
       ]
       set energy energy / 2
 
-      hatch 1 [
-        init-rabbit [xcor] of myself [ycor] of myself
-        fd 1
+      let is-reproduction-successfull one-of [true false]
+      
+      if is-reproduction-successfull [
+        hatch 1 [
+          init-rabbit [xcor] of myself [ycor] of myself
+          fd 1
+        ]
       ]
     ]
   ]
