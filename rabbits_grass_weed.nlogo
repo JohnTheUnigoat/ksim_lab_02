@@ -1,41 +1,96 @@
 breed [rabbits rabbit]
-rabbits-own [ energy ]
+rabbits-own [
+  energy
+  sex
+  is-sick
+  sick-ticks-remaining
+]
 
 to setup
   clear-all
   grow-grass-and-weeds
   set-default-shape rabbits "rabbit"
-  create-rabbits number [
-    set color white
-    setxy random-xcor random-ycor
-    set energy random 10  ;start with a random amt. of energy
+  create-rabbits initial-rabbit-count [
+    init-rabbit random-xcor random-ycor    
   ]
+
   reset-ticks
 end
 
 to go
+  ; stop if there are no more rabbits or if all remaining rabbits are of the same sex
   if not any? rabbits [ stop ]
+  if not any? rabbits with [sex = "male"] [ stop ]
+  if not any? rabbits with [sex = "female"] [ stop ]
+  
+  
   grow-grass-and-weeds
-  ask rabbits
-  [ move
-    eat-grass
-    eat-weeds
-    reproduce
-    death ]
+  ask rabbits [
+    ifelse is-sick [
+      be-sick
+    ][
+      move
+      eat-grass
+      eat-weeds
+      reproduce
+    ]
+    die-if-tired
+  ]
   tick
 end
 
 to grow-grass-and-weeds
   ask patches [
     if pcolor = black [
-      if random-float 1000 < weeds-grow-rate
-        [ set pcolor violet ]
-      if random-float 1000 < grass-grow-rate
-        [ set pcolor green ]
-  ] ]
+      if random-float 1000 < weeds-grow-rate [
+        set pcolor violet
+      ]
+      if random-float 1000 < grass-grow-rate [
+        set pcolor green
+      ]
+    ]
+  ]
 end
 
-to move  ;; rabbit procedure
+to init-rabbit [init-x init-y] ;; rabbit procedure
+  set sex one-of ["male" "female"]
+  set-color-by-sex
+  setxy init-x init-y
+  set energy random 10
+  set is-sick false
+  set sick-ticks-remaining 0
+end
+
+to get-sick ;; rabbit procedure
+  ; get sick for 3 ticks
+  set is-sick true
+  set sick-ticks-remaining 3
+  set color gray
+end
+
+to get-healthy ;; rabbit procedure
+  set is-sick false
+  set-color-by-sex
+end
+
+to set-color-by-sex ;; rabbit procedure
+  set color (ifelse-value
+      sex = "male" [sky]
+      sex = "female" [pink]
+    )
+end
+
+to be-sick ;; rabbit procedure
+  set sick-ticks-remaining sick-ticks-remaining - 1
+  set energy energy - sick-tick-energy-cost
+  
+  if sick-ticks-remaining = 0 [
+    set is-sick false
+    set-color-by-sex
+  ]
+end
+
+to move ;; rabbit procedure
   rt random 50
   lt random 50
   fd 1
@@ -43,35 +98,67 @@ to move  ;; rabbit procedure
   set energy energy - 0.5
 end
 
-to eat-grass  ;; rabbit procedure
+to eat-grass ;; rabbit procedure
   ;; gain "grass-energy" by eating grass
-  if pcolor = green
-  [ set pcolor black
-    set energy energy + grass-energy ]
+  if pcolor = green [
+    set pcolor black
+    set energy energy + grass-energy
+  ]
 end
 
-to eat-weeds  ;; rabbit procedure
-  ;; gain "weed-energy" by eating weeds
-  if pcolor = violet
-  [ set pcolor black
-    set energy energy + weed-energy ]
+to eat-weeds ;; rabbit procedure
+  ;; gain "weed-energy" by eating weeds and have a chance of getting sick
+  if pcolor = violet [
+    set pcolor black
+    set energy energy + weed-energy
+
+    let sickness-roll (random 100) + 1 ; 1-100 roll
+    if sickness-roll <= weeds-sickness-chance [
+      get-sick
+    ]
+  ]
 end
 
-to reproduce     ;; rabbit procedure
-  ;; give birth to a new rabbit, but it takes lots of energy
-  if energy > birth-threshold
-    [ set energy energy / 2
-      hatch 1 [ fd 1 ] ]
+to reproduce ;; rabbit procedure
+  if energy > birth-threshold [
+    let partner-sex other-sex sex
+
+    let possible-partners rabbits in-radius 1 with [
+      sex = partner-sex and
+      energy > birth-threshold and
+      not is-sick
+    ]
+
+    if any? possible-partners [
+      let partner min-one-of possible-partners [distance myself]
+      ask partner [
+        set energy energy / 2
+      ]
+      set energy energy / 2
+
+      let is-reproduction-successfull one-of [true false]
+      
+      if is-reproduction-successfull [
+        hatch 1 [
+          init-rabbit [xcor] of myself [ycor] of myself
+          fd 1
+        ]
+      ]
+    ]
+  ]
 end
 
-to death     ;; rabbit procedure
-  ;; die if you run out of energy
+to die-if-tired ;; rabbit procedure
   if energy < 0 [ die ]
 end
 
+to-report other-sex [my-sex]
+  report (ifelse-value
+    sex = "male" ["female"]
+    sex = "female" ["male"]
+  )
+end
 
-; Copyright 2001 Uri Wilensky.
-; See Info tab for full copyright and license.
 @#$#@#$#@
 GRAPHICS-WINDOW
 296
@@ -165,9 +252,9 @@ NIL
 HORIZONTAL
 
 SLIDER
-144
+145
 160
-275
+276
 193
 grass-energy
 grass-energy
@@ -195,12 +282,12 @@ NIL
 HORIZONTAL
 
 SLIDER
+30
 35
-42
-261
-75
-number
-number
+256
+68
+initial-rabbit-count
+initial-rabbit-count
 0.0
 500.0
 150
@@ -210,10 +297,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-65
-127
-225
-160
+5
+125
+280
+158
 birth-threshold
 birth-threshold
 0.0
@@ -225,10 +312,10 @@ NIL
 HORIZONTAL
 
 PLOT
-4
-228
-275
-424
+10
+325
+281
+521
 Populations
 Time
 Pop
@@ -238,20 +325,72 @@ Pop
 111
 true
 true
-"set-plot-y-range 0 number" ""
+"set-plot-y-range 0 initial-rabbit-count" ""
 PENS
 "grass" 1 0 -10899396 true "" "plot count patches with [pcolor = green] / 4"
 "rabbits" 1 0 -2674135 true "" "plot count rabbits"
 "weeds" 1 0 -8630108 true "" "plot count patches with [pcolor = violet] / 4"
 
 MONITOR
-186
-424
-275
-469
+295
+520
+420
+565
 count rabbits
 count rabbits
 1
+1
+11
+
+SLIDER
+5
+230
+280
+263
+weeds-sickness-chance
+weeds-sickness-chance
+0
+100
+50
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+5
+270
+280
+303
+sick-tick-energy-cost
+sick-tick-energy-cost
+0
+4
+2
+0.5
+1
+NIL
+HORIZONTAL
+
+MONITOR
+420
+520
+490
+565
+count males
+count rabbits with [sex = \"male\"]
+17
+1
+11
+
+MONITOR
+490
+520
+560
+565
+count females
+count rabbits with [sex = \"female\"]
+17
 1
 11
 @#$#@#$#@
